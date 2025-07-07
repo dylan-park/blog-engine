@@ -47,7 +47,8 @@ pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
         Html(rendered)
     } else if md_input == "404".to_owned() {
         // 404
-        Html("404".to_owned())
+        let rendered = tera.render("404.html", &context).unwrap();
+        Html(rendered)
     } else {
         // Split front matter and markdown body
         let (front_matter_str, md_body) = if md_input.starts_with("+++") {

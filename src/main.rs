@@ -11,7 +11,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(blog::render_page))
         .route("/favicon.ico", get(blog::ignore_favicon))
-        .route_service("/static/{*path}", ServeDir::new("static"))
+        .nest_service("/static", ServeDir::new("static"))
         .route("/{*path}", get(blog::render_page));
 
     // Run the server

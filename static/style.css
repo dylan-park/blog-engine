@@ -1,4 +1,4 @@
-/* General */
+/* THIS IS TEMPORARY, REMOVE IN PRODUCTION */
 
 * {
 	margin: 0;
@@ -135,28 +135,81 @@ body {
 	border-radius: 2px;
 }
 
-/* Blog Post specific */
-
-.post-meta-header {
-	display: flex;
-	gap: 1rem;
-	margin-bottom: 2rem;
-	font-size: 0.9rem;
-	align-items: center;
-	flex-wrap: wrap;
+.skills-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+	gap: 1.5rem;
+	margin-top: 2rem;
 }
 
-.post-date {
-	color: #666;
-}
-
-.post-category {
-	background: linear-gradient(45deg, #8e44ad 0%, #663399 100%);
-	color: white;
-	padding: 0.2rem 0.8rem;
+.skill-card {
+	background: #f8f9fa;
+	padding: 1.5rem;
 	border-radius: 12px;
-	font-size: 0.8rem;
-	font-weight: 500;
+	border-left: 4px solid #8e44ad;
+	transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.skill-card:hover {
+	transform: translateY(-5px);
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.skill-card h3 {
+	color: #2c3e50;
+	margin-bottom: 0.5rem;
+	font-size: 1.2rem;
+}
+
+.skill-card p {
+	color: #666;
+	font-size: 0.95rem;
+}
+
+.highlight-box {
+	background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #1a252f 100%);
+	color: white;
+	padding: 2rem;
+	border-radius: 15px;
+	margin: 2rem 0;
+	text-align: center;
+	position: relative;
+	overflow: hidden;
+}
+
+.highlight-box::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+	animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+	0% {
+		left: -100%;
+	}
+
+	100% {
+		left: 100%;
+	}
+}
+
+.highlight-box h3 {
+	font-size: 1.5rem;
+	margin-bottom: 1rem;
+	position: relative;
+	z-index: 1;
+}
+
+.highlight-box p {
+	font-size: 1.1rem;
+	opacity: 0.9;
+	position: relative;
+	z-index: 1;
 }
 
 .contact {
@@ -164,6 +217,11 @@ body {
 	color: white;
 	padding: 3rem 2rem;
 	text-align: center;
+}
+
+.contact h2 {
+	color: white;
+	margin-bottom: 2rem;
 }
 
 .contact-links {
@@ -198,9 +256,20 @@ body {
 }
 
 @media (max-width: 768px) {
-	.post-meta-header {
+	.hero h1 {
+		font-size: 3rem;
+	}
+
+	.hero .subtitle {
+		font-size: 1.1rem;
+	}
+
+	.skills-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.contact-links {
 		flex-direction: column;
-		gap: 0.5rem;
-		align-items: flex-start;
+		align-items: center;
 	}
 }

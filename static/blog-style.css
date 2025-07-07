@@ -1,0 +1,33 @@
+.card {
+	transform: translateY(0%);
+	animation: none;
+}
+
+.post-meta-header {
+	display: flex;
+	gap: 1rem;
+	margin-bottom: 2rem;
+	font-size: 0.9rem;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.post-date {
+	color: #666;
+}
+
+.post-category {
+	background: linear-gradient(45deg, #8e44ad 0%, #663399 100%);
+	color: white;
+	padding: 0.2rem 0.8rem;
+	border-radius: 12px;
+	font-size: 0.8rem;
+	font-weight: 500;
+}
+@media (max-width: 768px) {
+	.post-meta-header {
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+}

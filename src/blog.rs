@@ -9,7 +9,7 @@ use std::{fs, path::Path as StdPath};
 use tera::{Context, Tera};
 
 #[derive(Debug, Deserialize)]
-struct FrontMatter {
+pub struct FrontMatter {
     title: Option<String>,
     date: Option<NaiveDate>,
     category: Option<String>,
@@ -50,34 +50,48 @@ pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
         let rendered = tera.render("404.html", &context).unwrap();
         Html(rendered)
     } else {
-        // Split front matter and markdown body
-        let (front_matter_str, md_body) = if md_input.starts_with("+++") {
-            let parts: Vec<&str> = md_input.splitn(3, "+++").collect();
-            if parts.len() == 3 {
-                (parts[1].trim(), parts[2].trim())
-            } else {
-                ("", md_input.as_str())
-            }
-        } else {
-            ("", md_input.as_str())
-        };
+        // Matching blog post
+        let parsed_input = parse_markdown_with_front_matter(md_input).await.unwrap();
 
-        let metadata: FrontMatter = toml::from_str(front_matter_str).unwrap();
-        let html_content = markdown_to_html(&md_body, &ComrakOptions::default());
+        let metadata = parsed_input.0;
+        let html_content = parsed_input.1;
         context.insert("title", &metadata.title);
         context.insert("category", &metadata.category);
         context.insert("content", &html_content);
 
-        let formatted_date = metadata
-            .date
-            .map(|d| d.format("%B %e, %Y").to_string())
-            .unwrap_or_else(|| "Unknown date".to_string());
+        let formatted_date = format_date(metadata.date).await;
         context.insert("date", &formatted_date);
 
         let rendered = tera.render("post.html", &context).unwrap();
 
         Html(rendered)
     }
+}
+
+pub async fn parse_markdown_with_front_matter(
+    md_input: String,
+) -> Result<(FrontMatter, String), Box<dyn std::error::Error>> {
+    let (front_matter_str, md_body) = if md_input.starts_with("+++") {
+        let parts: Vec<&str> = md_input.splitn(3, "+++").collect();
+        if parts.len() == 3 {
+            (parts[1].trim(), parts[2].trim())
+        } else {
+            ("", md_input.as_str())
+        }
+    } else {
+        ("", md_input.as_str())
+    };
+
+    let metadata: FrontMatter = toml::from_str(front_matter_str)?;
+    let html_content = markdown_to_html(md_body, &ComrakOptions::default());
+
+    Ok((metadata, html_content))
+}
+
+pub async fn format_date(input: Option<NaiveDate>) -> String {
+    input
+        .map(|d| d.format("%B %e, %Y").to_string())
+        .unwrap_or_else(|| "Unknown date".to_string())
 }
 
 pub async fn ignore_favicon() -> Response {

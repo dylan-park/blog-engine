@@ -24,11 +24,11 @@ pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
                 return Html("404".to_owned());
             }
             let file_name = format!("{}.md", path.as_str());
-            let maybe_path = StdPath::new("content").join(file_name);
+            let maybe_path = StdPath::new("posts").join(file_name);
             match maybe_path.exists() {
                 true => {
                     // Matching blog post
-                    fs::read_to_string(format!("content/{}.md", path.as_str())).unwrap_or_default()
+                    fs::read_to_string(format!("posts/{}.md", path.as_str())).unwrap_or_default()
                 }
                 false => "404".to_owned(),
             }

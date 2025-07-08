@@ -42,7 +42,7 @@ pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
     let mut context = Context::new();
     if md_input == "".to_owned() {
         // Blog Home
-        context.insert("title", "Home");
+        context.insert("title", "Blog");
         let rendered = tera.render("blog.html", &context).unwrap();
         Html(rendered)
     } else if md_input == "404".to_owned() {

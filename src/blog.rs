@@ -1,7 +1,4 @@
-use axum::{
-    extract::Path,
-    response::{Html, IntoResponse, Response},
-};
+use axum::{extract::Path, response::Html};
 use chrono::NaiveDate;
 use comrak::{ComrakOptions, markdown_to_html};
 use serde::Deserialize;
@@ -92,9 +89,4 @@ pub async fn format_date(input: Option<NaiveDate>) -> String {
     input
         .map(|d| d.format("%B %e, %Y").to_string())
         .unwrap_or_else(|| "Unknown date".to_string())
-}
-
-pub async fn ignore_favicon() -> Response {
-    ().into_response()
-    // TODO: Look into serving favicon
 }

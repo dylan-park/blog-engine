@@ -64,8 +64,10 @@
 .pagination-btn {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	gap: 0.5rem;
 	padding: 0.8rem 1.5rem;
+	min-width: 6.875rem;
 	background: linear-gradient(135deg, #8e44ad 0%, #663399 100%);
 	color: white;
 	text-decoration: none;

@@ -1,9 +1,17 @@
-use axum::{extract::Path, response::Html};
+use axum::{
+    extract::{Path, Query},
+    response::Html,
+};
 use chrono::NaiveDate;
 use comrak::{ComrakOptions, markdown_to_html};
 use serde::Deserialize;
 use std::{fs, path::Path as StdPath};
 use tera::{Context, Tera};
+
+#[derive(Debug, Deserialize)]
+pub struct PageQuery {
+    page: Option<usize>,
+}
 
 #[derive(Debug, Deserialize)]
 struct FrontMatter {
@@ -12,9 +20,13 @@ struct FrontMatter {
     category: Option<String>,
 }
 
-pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
+pub async fn render_page(
+    path: Option<Path<String>>,
+    Query(params): Query<PageQuery>,
+) -> Html<String> {
     let tera = Tera::new("templates/**/*").unwrap();
     let mut context = Context::new();
+
     let md_input = match path {
         None => {
             // Blog Home
@@ -39,8 +51,10 @@ pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
 
     if md_input == "".to_owned() {
         // Blog Home
+        let recent_posts = render_recent_posts(params.page.unwrap_or(1)).await;
         context.insert("title", "Blog");
-        context.insert("posts", &render_recent_posts().await);
+        context.insert("posts", &recent_posts.0);
+        context.insert("pagination", &recent_posts.1);
         let rendered = tera.render("blog.html", &context).unwrap();
         Html(rendered)
     } else if md_input == "404".to_owned() {
@@ -66,7 +80,7 @@ pub async fn render_page(path: Option<Path<String>>) -> Html<String> {
     }
 }
 
-async fn render_recent_posts() -> String {
+async fn render_recent_posts(page: usize) -> (String, String) {
     // Get all files from posts dir
     let mut files: Vec<String> = fs::read_dir("posts")
         .unwrap()
@@ -85,15 +99,22 @@ async fn render_recent_posts() -> String {
         .collect();
     // Sort descending
     files.sort_by(|a, b| b.cmp(a));
+    let total_files = files.len();
+    // Query String pagination
+    files = files
+        .chunks(3)
+        .nth(page - 1)
+        .map(|chunk| chunk.to_vec())
+        .unwrap_or(Vec::new());
 
-    let mut output = "".to_owned();
+    let mut posts_output = "".to_owned();
 
     for file in &files {
         let md_input = fs::read_to_string(format!("posts/{}.md", file)).unwrap_or_default();
         let parsed_input = parse_markdown_with_front_matter(md_input).await.unwrap();
-        output = format!(
+        posts_output = format!(
             "{}{}",
-            output,
+            posts_output,
             generate_blog_post_card(
                 format_date(parsed_input.0.date).await,
                 parsed_input.0.category.unwrap(),
@@ -105,8 +126,34 @@ async fn render_recent_posts() -> String {
         );
     }
 
-    // TODO: Implement pagination
-    output
+    // Pagination link logic
+    let pagination_output = if total_files > 3 && (page - 1) * 3 < total_files {
+        let total_pages = (total_files + 3 - 1) / 3;
+
+        match page {
+            1 => format!(
+                "<a class=\"pagination-btn next-btn\" href=\"?page=2\"><span>Next</span></a><span class=\"page-info\">Page {} of {}</span>",
+                page, total_pages
+            ),
+            p if p == total_pages => format!(
+                "<a class=\"pagination-btn prev-btn\" href=\"?page={}\"><span>Previous</span></a><span class=\"page-info\">Page {} of {}</span>",
+                page - 1,
+                page,
+                total_pages
+            ),
+            _ => format!(
+                "<a class=\"pagination-btn prev-btn\" href=\"?page={}\"><span>Previous</span></a><span class=\"page-info\">Page {} of {}</span><a class=\"pagination-btn next-btn\" href=\"?page={}\"><span>Next</span></a>",
+                page - 1,
+                page,
+                total_pages,
+                page + 1
+            ),
+        }
+    } else {
+        String::new()
+    };
+
+    (posts_output, pagination_output)
 }
 
 async fn truncate_html_text(html: &str, max_length: usize) -> String {

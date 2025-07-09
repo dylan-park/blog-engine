@@ -1,9 +1,11 @@
 use axum::{
     extract::{Path, Query},
+    http::StatusCode,
     response::Html,
 };
 use chrono::NaiveDate;
 use comrak::{ComrakOptions, markdown_to_html};
+use log::info;
 use serde::Deserialize;
 use std::{fs, path::Path as StdPath};
 use tera::{Context, Tera};
@@ -23,7 +25,7 @@ struct FrontMatter {
 pub async fn render_page(
     path: Option<Path<String>>,
     Query(params): Query<PageQuery>,
-) -> Html<String> {
+) -> (StatusCode, Html<String>) {
     let tera = Tera::new("templates/**/*").unwrap();
     let mut context = Context::new();
 
@@ -35,7 +37,10 @@ pub async fn render_page(
         Some(ref path) => {
             if path.as_str().contains("..") {
                 // 404 (Traversal prevention)
-                return Html(tera.render("404.html", &context).unwrap());
+                return (
+                    StatusCode::NOT_FOUND,
+                    Html(tera.render("404.html", &context).unwrap()),
+                );
             }
             let file_name = format!("{}.md", path.as_str());
             let maybe_path = StdPath::new("posts").join(file_name);
@@ -56,11 +61,13 @@ pub async fn render_page(
         context.insert("posts", &recent_posts.0);
         context.insert("pagination", &recent_posts.1);
         let rendered = tera.render("blog.html", &context).unwrap();
-        Html(rendered)
+        info!("Served: Blog Home");
+        (StatusCode::OK, Html(rendered))
     } else if md_input == "404" {
         // 404
         let rendered = tera.render("404.html", &context).unwrap();
-        Html(rendered)
+        info!("Served: 404: {}", path.unwrap().0);
+        (StatusCode::NOT_FOUND, Html(rendered))
     } else {
         // Matching blog post
         let parsed_input = parse_markdown_with_front_matter(md_input).await.unwrap();
@@ -75,8 +82,8 @@ pub async fn render_page(
         context.insert("date", &formatted_date);
 
         let rendered = tera.render("post.html", &context).unwrap();
-
-        Html(rendered)
+        info!("Served: Blog Post: {}", &metadata.title.unwrap());
+        (StatusCode::OK, Html(rendered))
     }
 }
 

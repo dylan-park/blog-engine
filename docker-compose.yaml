@@ -8,7 +8,7 @@ services:
       - ./static:/app/static
       - ./templates:/app/templates
     ports:
-      - 9000:3000
+      - 8339:3000
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/health"]

@@ -1,0 +1,18 @@
+services:
+  blog-engine:
+    build: .
+    container_name: blog-engine
+    network_mode: bridge
+    volumes:
+      - ./posts:/app/posts
+      - ./static:/app/static
+      - ./templates:/app/templates
+    ports:
+      - 9000:3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/health"]
+      interval: 60s
+      timeout: 15s
+      start_period: 10s
+      retries: 5

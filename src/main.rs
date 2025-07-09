@@ -13,6 +13,7 @@ async fn main() {
     // Build axum router
     let app = Router::new()
         .route("/", get(blog::render_page))
+        .route("/health", get(blog::health_check))
         .nest_service("/static", ServeDir::new("static"))
         .route("/{*path}", get(blog::render_page));
 

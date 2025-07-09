@@ -273,3 +273,7 @@ async fn format_date(input: Option<NaiveDate>) -> String {
         .map(|d| d.format("%B %e, %Y").to_string())
         .unwrap_or_else(|| "Unknown date".to_string())
 }
+
+pub async fn health_check() -> (StatusCode, Html<String>) {
+    (StatusCode::OK, Html("OK".to_owned()))
+}

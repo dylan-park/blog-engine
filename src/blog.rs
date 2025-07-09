@@ -49,7 +49,7 @@ pub async fn render_page(
         }
     };
 
-    if md_input == "".to_owned() {
+    if md_input.is_empty() {
         // Blog Home
         let recent_posts = render_recent_posts(params.page.unwrap_or(1)).await;
         context.insert("title", "Blog");
@@ -57,7 +57,7 @@ pub async fn render_page(
         context.insert("pagination", &recent_posts.1);
         let rendered = tera.render("blog.html", &context).unwrap();
         Html(rendered)
-    } else if md_input == "404".to_owned() {
+    } else if md_input == "404" {
         // 404
         let rendered = tera.render("404.html", &context).unwrap();
         Html(rendered)
@@ -105,12 +105,12 @@ async fn render_recent_posts(page: usize) -> (String, String) {
         .chunks(3)
         .nth(page - 1)
         .map(|chunk| chunk.to_vec())
-        .unwrap_or(Vec::new());
+        .unwrap_or_default();
 
     let mut posts_output = "".to_owned();
 
     for file in &files {
-        let md_input = fs::read_to_string(format!("posts/{}.md", file)).unwrap_or_default();
+        let md_input = fs::read_to_string(format!("posts/{file}.md")).unwrap_or_default();
         let parsed_input = parse_markdown_with_front_matter(md_input).await.unwrap();
         posts_output = format!(
             "{}{}",
@@ -128,12 +128,11 @@ async fn render_recent_posts(page: usize) -> (String, String) {
 
     // Pagination link logic
     let pagination_output = if total_files > 3 && (page - 1) * 3 < total_files {
-        let total_pages = (total_files + 3 - 1) / 3;
+        let total_pages = total_files.div_ceil(3);
 
         match page {
             1 => format!(
-                "<a class=\"pagination-btn next-btn\" href=\"?page=2\"><span>Next</span></a><span class=\"page-info\">Page {} of {}</span>",
-                page, total_pages
+                "<a class=\"pagination-btn next-btn\" href=\"?page=2\"><span>Next</span></a><span class=\"page-info\">Page {page} of {total_pages}</span>"
             ),
             p if p == total_pages => format!(
                 "<a class=\"pagination-btn prev-btn\" href=\"?page={}\"><span>Previous</span></a><span class=\"page-info\">Page {} of {}</span>",
@@ -166,7 +165,7 @@ async fn truncate_html_text(html: &str, max_length: usize) -> String {
     let truncated = find_word_boundary(&text, max_length).await;
 
     if truncated.len() < text.len() {
-        format!("{}...", truncated)
+        format!("{truncated}...")
     } else {
         truncated
     }
@@ -175,9 +174,9 @@ async fn truncate_html_text(html: &str, max_length: usize) -> String {
 async fn strip_html_tags(html: &str) -> String {
     let mut result = String::new();
     let mut inside_tag = false;
-    let mut chars = html.chars().peekable();
+    let chars = html.chars().peekable();
 
-    while let Some(ch) = chars.next() {
+    for ch in chars {
         match ch {
             '<' => {
                 inside_tag = true;
@@ -229,17 +228,16 @@ async fn generate_blog_post_card(
         r#"
         <article class="blog-post-card">
             <div class="post-meta">
-                <span class="post-date">{}</span>
-                <span class="post-category">{}</span>
+                <span class="post-date">{date}</span>
+                <span class="post-category">{category}</span>
             </div>
             <h3>
-                <a href="{}">{}</a>
+                <a href="{path}">{title}</a>
             </h3>
-            <p>{}</p>
-            <a href="{}" class="read-more">Read More</a>
+            <p>{content}</p>
+            <a href="{path}" class="read-more">Read More</a>
         </article>
-        "#,
-        date, category, path, title, content, path
+        "#
     )
 }
 

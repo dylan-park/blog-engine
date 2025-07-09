@@ -17,7 +17,7 @@ async fn main() {
         .route("/{*path}", get(blog::render_page));
 
     // Run the server
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     let listener = TcpListener::bind(addr).await.unwrap();
     info!("Server running on http://{addr}");
     axum::serve(listener, app.into_make_service())

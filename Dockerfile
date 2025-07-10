@@ -7,11 +7,14 @@ WORKDIR /usr/src/app
 # Copy dependency files first for better layer caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Create a dummy lib.rs to build dependencies
+RUN mkdir src && echo "// dummy" > src/lib.rs
 
 # Build dependencies for cache
-RUN cargo build --release && rm -rf src target/release/deps/blog-engine*
+RUN cargo build --release --lib
+
+# Remove the dummy lib
+RUN rm -rf src
 
 # Copy the source code
 COPY . .

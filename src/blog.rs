@@ -133,31 +133,7 @@ async fn render_recent_posts(page: usize) -> (String, String) {
         );
     }
 
-    // Pagination link logic
-    let pagination_output = if total_files > 3 && (page - 1) * 3 < total_files {
-        let total_pages = total_files.div_ceil(3);
-
-        match page {
-            1 => format!(
-                "<a class=\"pagination-btn next-btn\" href=\"?page=2\"><span>Next</span></a><span class=\"page-info\">Page {page} of {total_pages}</span>"
-            ),
-            p if p == total_pages => format!(
-                "<a class=\"pagination-btn prev-btn\" href=\"?page={}\"><span>Previous</span></a><span class=\"page-info\">Page {} of {}</span>",
-                page - 1,
-                page,
-                total_pages
-            ),
-            _ => format!(
-                "<a class=\"pagination-btn prev-btn\" href=\"?page={}\"><span>Previous</span></a><span class=\"page-info\">Page {} of {}</span><a class=\"pagination-btn next-btn\" href=\"?page={}\"><span>Next</span></a>",
-                page - 1,
-                page,
-                total_pages,
-                page + 1
-            ),
-        }
-    } else {
-        String::new()
-    };
+    let pagination_output = generate_pagination(total_files, page).await;
 
     (posts_output, pagination_output)
 }
@@ -231,21 +207,46 @@ async fn generate_blog_post_card(
     title: String,
     content: String,
 ) -> String {
-    format!(
-        r#"
-        <article class="blog-post-card">
-            <div class="post-meta">
-                <span class="post-date">{date}</span>
-                <span class="post-category">{category}</span>
-            </div>
-            <h3>
-                <a href="{path}">{title}</a>
-            </h3>
-            <p>{content}</p>
-            <a href="{path}" class="read-more">Read More</a>
-        </article>
-        "#
-    )
+    let tera = Tera::new("templates/**/*").unwrap();
+    let mut context = Context::new();
+    context.insert("date", &date);
+    context.insert("category", &category);
+    context.insert("path", &path);
+    context.insert("title", &title);
+    context.insert("content", &content);
+
+    tera.render("blog-post-card.html", &context).unwrap()
+}
+
+async fn generate_pagination(total_files: usize, page: usize) -> String {
+    let tera = Tera::new("templates/**/*").unwrap();
+    let mut context = Context::new();
+    if total_files > 3 && (page - 1) * 3 < total_files {
+        let total_pages = total_files.div_ceil(3);
+
+        match page {
+            1 => {
+                context.insert("page", &page);
+                context.insert("total_pages", &total_pages);
+                tera.render("pagination/next.html", &context).unwrap()
+            }
+            p if p == total_pages => {
+                context.insert("previous_page", &(page - 1));
+                context.insert("page", &page);
+                context.insert("total_pages", &total_pages);
+                tera.render("pagination/previous.html", &context).unwrap()
+            }
+            _ => {
+                context.insert("previous_page", &(page - 1));
+                context.insert("page", &page);
+                context.insert("total_pages", &total_pages);
+                context.insert("next_page", &(page + 1));
+                tera.render("pagination/previous-next.html", &context).unwrap()
+            },
+        }
+    } else {
+        String::new()
+    }
 }
 
 async fn parse_markdown_with_front_matter(

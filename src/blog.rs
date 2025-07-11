@@ -1,17 +1,22 @@
 use crate::{
     PageQuery,
-    utils::utils::{format_date, parse_markdown_with_front_matter, truncate_html_text},
+    utils::{
+        error::AppError,
+        utils::{format_date, parse_markdown_with_front_matter, truncate_html_text},
+    },
 };
+use anyhow::{Context, Result};
 use axum::{
     extract::{Path, Query},
     http::StatusCode,
     response::Html,
 };
 use chrono::NaiveDate;
-use log::info;
 use serde::Deserialize;
 use std::{fs, path::Path as StdPath};
-use tera::{Context, Tera};
+use tera::{Context as TeraContext, Tera};
+use tracing::info;
+
 #[derive(Debug, Deserialize)]
 pub struct FrontMatter {
     title: Option<String>,
@@ -22,9 +27,10 @@ pub struct FrontMatter {
 pub async fn render_page(
     path: Option<Path<String>>,
     Query(params): Query<PageQuery>,
-) -> (StatusCode, Html<String>) {
-    let tera = Tera::new("templates/**/*").unwrap();
-    let mut context = Context::new();
+) -> Result<(StatusCode, Html<String>), AppError> {
+    let tera =
+        Tera::new("templates/**/*").context("Failed to load templates from 'templates/**/*'")?;
+    let mut context = TeraContext::new();
 
     let md_input = match path {
         None => {
@@ -34,10 +40,13 @@ pub async fn render_page(
         Some(ref path) => {
             if path.as_str().contains("..") {
                 // 404 (Traversal prevention)
-                return (
+                return Ok((
                     StatusCode::NOT_FOUND,
-                    Html(tera.render("404.html", &context).unwrap()),
-                );
+                    Html(
+                        tera.render("404.html", &context)
+                            .context("Error rendering template: '404.html'")?,
+                    ),
+                ));
             }
             let file_name = format!("{}.md", path.as_str());
             let maybe_path = StdPath::new("posts").join(file_name);
@@ -53,21 +62,34 @@ pub async fn render_page(
 
     if md_input.is_empty() {
         // Blog Home
-        let recent_posts = render_recent_posts(params.page.unwrap_or(1)).await;
+        let recent_posts = render_recent_posts(params.page.unwrap_or(1))
+            .await
+            .context("Unable to render recent posts")?;
         context.insert("title", "Blog");
         context.insert("posts", &recent_posts.0);
         context.insert("pagination", &recent_posts.1);
-        let rendered = tera.render("blog.html", &context).unwrap();
+        let rendered = tera
+            .render("blog.html", &context)
+            .context("Error rendering template: 'blog.html'")?;
         info!("Served: Blog Home | Page {}", params.page.unwrap_or(1));
-        (StatusCode::OK, Html(rendered))
+        Ok((StatusCode::OK, Html(rendered)))
     } else if md_input == "404" {
         // 404
-        let rendered = tera.render("404.html", &context).unwrap();
-        info!("Served: 404 | {}", path.unwrap().0);
-        (StatusCode::NOT_FOUND, Html(rendered))
+        let rendered = tera
+            .render("404.html", &context)
+            .context("Error rendering template: '404.html'")?;
+        info!(
+            "Served: 404 | {}",
+            path.as_ref()
+                .map(|p| p.0.as_str())
+                .unwrap_or("<unknown path>")
+        );
+        Ok((StatusCode::NOT_FOUND, Html(rendered)))
     } else {
         // Matching blog post
-        let parsed_input = parse_markdown_with_front_matter(md_input).await.unwrap();
+        let parsed_input = parse_markdown_with_front_matter(md_input)
+            .await
+            .context("Unable to parse markdown with front matter")?;
 
         let metadata = parsed_input.0;
         let html_content = parsed_input.1;
@@ -76,18 +98,23 @@ pub async fn render_page(
         context.insert("content", &html_content);
 
         let formatted_date = format_date(metadata.date).await;
-        context.insert("date", &formatted_date);
+        context.insert("date", &formatted_date.context("Unable to format date")?);
 
-        let rendered = tera.render("post.html", &context).unwrap();
-        info!("Served: Blog Post | {}", &metadata.title.unwrap());
-        (StatusCode::OK, Html(rendered))
+        let rendered = tera
+            .render("post.html", &context)
+            .context("Error rendering template: 'post.html'")?;
+        info!(
+            "Served: Blog Post | {}",
+            &metadata.title.as_deref().unwrap_or("<unknown title>")
+        );
+        Ok((StatusCode::OK, Html(rendered)))
     }
 }
 
-async fn render_recent_posts(page: usize) -> (String, String) {
+async fn render_recent_posts(page: usize) -> Result<(String, String)> {
     // Get all files from posts dir
     let mut files: Vec<String> = fs::read_dir("posts")
-        .unwrap()
+        .context("Unable to read directory 'posts'")?
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())
         .filter_map(|entry| {
@@ -115,24 +142,36 @@ async fn render_recent_posts(page: usize) -> (String, String) {
 
     for file in &files {
         let md_input = fs::read_to_string(format!("posts/{file}.md")).unwrap_or_default();
-        let parsed_input = parse_markdown_with_front_matter(md_input).await.unwrap();
+        let parsed_input = parse_markdown_with_front_matter(md_input)
+            .await
+            .context("Unable to parse markdown with front matter")?;
         posts_output = format!(
             "{}{}",
             posts_output,
             generate_blog_post_card(
-                format_date(parsed_input.0.date).await,
-                parsed_input.0.category.unwrap(),
+                format_date(parsed_input.0.date)
+                    .await
+                    .context("Unable to format date")?,
+                parsed_input
+                    .0
+                    .category
+                    .context("Unable to get post category")?,
                 file.to_owned(),
-                parsed_input.0.title.unwrap(),
-                truncate_html_text(parsed_input.1.as_str(), 240).await,
+                parsed_input.0.title.context("Unable to get post title")?,
+                truncate_html_text(parsed_input.1.as_str(), 240)
+                    .await
+                    .context("Unable to truncate html text")?,
             )
             .await
+            .context("Error generating blog post card")?
         );
     }
 
-    let pagination_output = generate_pagination(total_files, page).await;
+    let pagination_output = generate_pagination(total_files, page)
+        .await
+        .context("Error generating pagination")?;
 
-    (posts_output, pagination_output)
+    Ok((posts_output, pagination_output))
 }
 
 async fn generate_blog_post_card(
@@ -141,21 +180,25 @@ async fn generate_blog_post_card(
     path: String,
     title: String,
     content: String,
-) -> String {
-    let tera = Tera::new("templates/**/*").unwrap();
-    let mut context = Context::new();
+) -> Result<String> {
+    let tera =
+        Tera::new("templates/**/*").context("Failed to load templates from 'templates/**/*'")?;
+    let mut context = TeraContext::new();
     context.insert("date", &date);
     context.insert("category", &category);
     context.insert("path", &path);
     context.insert("title", &title);
     context.insert("content", &content);
 
-    tera.render("blog-post-card.html", &context).unwrap()
+    Ok(tera
+        .render("blog-post-card.html", &context)
+        .context("Error rendering template: 'blog-post-card.html'")?)
 }
 
-async fn generate_pagination(total_files: usize, page: usize) -> String {
-    let tera = Tera::new("templates/**/*").unwrap();
-    let mut context = Context::new();
+async fn generate_pagination(total_files: usize, page: usize) -> Result<String> {
+    let tera =
+        Tera::new("templates/**/*").context("Failed to load templates from 'templates/**/*'")?;
+    let mut context = TeraContext::new();
 
     if total_files > 3 && (page - 1) * 3 < total_files {
         let total_pages = total_files.div_ceil(3);
@@ -163,8 +206,10 @@ async fn generate_pagination(total_files: usize, page: usize) -> String {
         context.insert("page", &page);
         context.insert("total_pages", &total_pages);
 
-        tera.render("pagination.html", &context).unwrap()
+        Ok(tera
+            .render("pagination.html", &context)
+            .context("Error rendering template: 'pagination.html'")?)
     } else {
-        String::new()
+        Ok(String::new())
     }
 }

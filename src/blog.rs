@@ -2,7 +2,7 @@ use crate::{
     PageQuery,
     utils::{
         error::AppError,
-        utils::{format_date, parse_markdown_with_front_matter, truncate_html_text},
+        utils::{format_date, parse_markdown_with_frontmatter, truncate_html_text},
     },
 };
 use anyhow::{Context, Result};
@@ -87,9 +87,9 @@ pub async fn render_page(
         Ok((StatusCode::NOT_FOUND, Html(rendered)))
     } else {
         // Matching blog post
-        let parsed_input = parse_markdown_with_front_matter(md_input)
+        let parsed_input = parse_markdown_with_frontmatter(md_input)
             .await
-            .context("Unable to parse markdown with front matter")?;
+            .context("Unable to parse markdown with frontmatter")?;
 
         let metadata = parsed_input.0;
         let html_content = parsed_input.1;
@@ -142,9 +142,9 @@ async fn render_recent_posts(page: usize) -> Result<(String, String)> {
 
     for file in &files {
         let md_input = fs::read_to_string(format!("posts/{file}.md")).unwrap_or_default();
-        let parsed_input = parse_markdown_with_front_matter(md_input)
+        let parsed_input = parse_markdown_with_frontmatter(md_input)
             .await
-            .context("Unable to parse markdown with front matter")?;
+            .context("Unable to parse markdown with frontmatter")?;
         posts_output = format!(
             "{}{}",
             posts_output,

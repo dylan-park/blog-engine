@@ -3,8 +3,8 @@ use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use comrak::{ComrakOptions, markdown_to_html};
 
-pub async fn parse_markdown_with_front_matter(md_input: String) -> Result<(FrontMatter, String)> {
-    let (front_matter_str, md_body) = if md_input.starts_with("+++") {
+pub async fn parse_markdown_with_frontmatter(md_input: String) -> Result<(FrontMatter, String)> {
+    let (frontmatter_str, md_body) = if md_input.starts_with("+++") {
         let parts: Vec<&str> = md_input.splitn(3, "+++").collect();
         if parts.len() == 3 {
             (parts[1].trim(), parts[2].trim())
@@ -15,7 +15,7 @@ pub async fn parse_markdown_with_front_matter(md_input: String) -> Result<(Front
         ("", md_input.as_str())
     };
 
-    let metadata: FrontMatter = toml::from_str(front_matter_str)?;
+    let metadata: FrontMatter = toml::from_str(frontmatter_str)?;
     let html_content = markdown_to_html(md_body, &ComrakOptions::default());
 
     Ok((metadata, html_content))

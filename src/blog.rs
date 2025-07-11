@@ -221,29 +221,14 @@ async fn generate_blog_post_card(
 async fn generate_pagination(total_files: usize, page: usize) -> String {
     let tera = Tera::new("templates/**/*").unwrap();
     let mut context = Context::new();
+
     if total_files > 3 && (page - 1) * 3 < total_files {
         let total_pages = total_files.div_ceil(3);
 
-        match page {
-            1 => {
-                context.insert("page", &page);
-                context.insert("total_pages", &total_pages);
-                tera.render("pagination/next.html", &context).unwrap()
-            }
-            p if p == total_pages => {
-                context.insert("previous_page", &(page - 1));
-                context.insert("page", &page);
-                context.insert("total_pages", &total_pages);
-                tera.render("pagination/previous.html", &context).unwrap()
-            }
-            _ => {
-                context.insert("previous_page", &(page - 1));
-                context.insert("page", &page);
-                context.insert("total_pages", &total_pages);
-                context.insert("next_page", &(page + 1));
-                tera.render("pagination/previous-next.html", &context).unwrap()
-            },
-        }
+        context.insert("page", &page);
+        context.insert("total_pages", &total_pages);
+
+        tera.render("pagination.html", &context).unwrap()
     } else {
         String::new()
     }

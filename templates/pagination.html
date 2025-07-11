@@ -1,0 +1,13 @@
+{% if page > 1 %}
+<a class="pagination-btn prev-btn" href="?page={{ page - 1 }}">
+    <span>Previous</span>
+</a>
+{% endif %}
+
+<span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+
+{% if page < total_pages %}
+<a class="pagination-btn next-btn" href="?page={{ page + 1 }}">
+    <span>Next</span>
+</a>
+{% endif %}

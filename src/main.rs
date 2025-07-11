@@ -3,7 +3,7 @@ use axum::{Router, routing::get};
 use env_logger::Builder;
 use log::info;
 use serde::Deserialize;
-use std::net::SocketAddr;
+use std::{fs, net::SocketAddr, path::Path};
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
@@ -18,6 +18,9 @@ pub struct PageQuery {
 #[tokio::main]
 async fn main() {
     Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
+    fs::create_dir_all(Path::new("posts")).unwrap();
+
     // Build axum router
     let app = Router::new()
         .route("/", get(blog::render_page))

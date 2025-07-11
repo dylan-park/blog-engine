@@ -1,11 +1,19 @@
+use crate::utils::health_check::health_check;
 use axum::{Router, routing::get};
 use env_logger::Builder;
 use log::info;
+use serde::Deserialize;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 mod blog;
+mod utils;
+
+#[derive(Debug, Deserialize)]
+pub struct PageQuery {
+    page: Option<usize>,
+}
 
 #[tokio::main]
 async fn main() {
@@ -13,7 +21,7 @@ async fn main() {
     // Build axum router
     let app = Router::new()
         .route("/", get(blog::render_page))
-        .route("/health", get(blog::health_check))
+        .route("/health", get(health_check))
         .nest_service("/static", ServeDir::new("static"))
         .route("/{*path}", get(blog::render_page));
 

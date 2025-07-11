@@ -58,12 +58,12 @@ pub async fn render_page(
         context.insert("posts", &recent_posts.0);
         context.insert("pagination", &recent_posts.1);
         let rendered = tera.render("blog.html", &context).unwrap();
-        info!("Served: Blog Home");
+        info!("Served: Blog Home | Page {}", params.page.unwrap_or(1));
         (StatusCode::OK, Html(rendered))
     } else if md_input == "404" {
         // 404
         let rendered = tera.render("404.html", &context).unwrap();
-        info!("Served: 404: {}", path.unwrap().0);
+        info!("Served: 404 | {}", path.unwrap().0);
         (StatusCode::NOT_FOUND, Html(rendered))
     } else {
         // Matching blog post
@@ -79,7 +79,7 @@ pub async fn render_page(
         context.insert("date", &formatted_date);
 
         let rendered = tera.render("post.html", &context).unwrap();
-        info!("Served: Blog Post: {}", &metadata.title.unwrap());
+        info!("Served: Blog Post | {}", &metadata.title.unwrap());
         (StatusCode::OK, Html(rendered))
     }
 }

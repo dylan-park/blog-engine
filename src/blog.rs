@@ -21,7 +21,7 @@ use tracing::info;
 pub struct FrontMatter {
     title: Option<String>,
     date: Option<NaiveDate>,
-    category: Option<String>,
+    category: Option<Vec<String>>,
 }
 
 pub async fn render_page(
@@ -94,7 +94,10 @@ pub async fn render_page(
         let metadata = parsed_input.0;
         let html_content = parsed_input.1;
         context.insert("title", &metadata.title);
-        context.insert("category", &metadata.category);
+        context.insert(
+            "category",
+            &metadata.category.context("Unable to get post category")?[0],
+        );
         context.insert("content", &html_content);
 
         let formatted_date = format_date(metadata.date).await;
@@ -155,7 +158,8 @@ async fn render_recent_posts(page: usize) -> Result<(String, String)> {
                 parsed_input
                     .0
                     .category
-                    .context("Unable to get post category")?,
+                    .context("Unable to get post category")?[0]
+                    .clone(),
                 file.to_owned(),
                 parsed_input.0.title.context("Unable to get post title")?,
                 truncate_html_text(parsed_input.1.as_str(), 240)

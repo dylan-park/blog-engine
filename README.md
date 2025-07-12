@@ -25,7 +25,7 @@ Posts are expected to have a Frontmatter in TOML format. All values are given as
 +++
 title = "Title"
 date = "yyyy-mm-dd"
-category = "Category"
+categories = ["Category"]
 +++
 ```
 

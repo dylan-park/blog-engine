@@ -1,4 +1,14 @@
 /* Blog Home*/
+.hero a {
+	color: white;
+	text-decoration: none;
+	transition: color 0.3s ease;
+}
+
+.hero a:hover {
+	color: #DDD;
+}
+
 .blog-post-card {
 	background: #f8f9fa;
 	padding: 2rem;

@@ -33,9 +33,10 @@ This data is used while generating the individual post pages, as well as the pos
 
 ## Future Work
 
-- **Use date from Frontmatter to sort posts** - Initially the naming convention requirement stemmed from the fact that in cases of large collections of posts, the act of scanning each one for its date was much higher complexity than just scanning through the files names one time. However, with the introduction of pagination, the job becomes much more manageable in scale.
-    - **Customize URL format** - As a side effect, this will allow the user to have more control over their final post URLs through file naming.
-
+- **In-Memory store of Frontmatter** - Instead of constantly re-reading frontmatter per-access, I want to keep a store of all post's frontmatter data in memory, maintaining it on every update to the posts directory.
+    - **Use date from Frontmatter to sort posts** - Initially the naming convention requirement stemmed from the fact that in cases of large collections of posts, the act of scanning each one for its date was much higher complexity than just scanning through the files names one time. However, with the introduction of in-memory frontmatter storage, the job becomes much more manageable in scale.
+        - **More Customized URL format** - As a side effect, this will allow the user to have more control over their final post URLs through file naming.
+    - **Proper Tagging Engine** - Currently the category system is primarily for show. It would be nice to be able to filter posts by certain categories. Saving myself the complexity of reading the frontmatter for every post on each request makes this possible.
 
 #### Note
 

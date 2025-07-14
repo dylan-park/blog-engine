@@ -52,6 +52,7 @@ While this setup enables you to have the file name (and thus URL) of any post be
 
 ## Future Work
 
+- **Automatically Managed RSS Feed** - Add an RSS feed that updates whenever there is new content.
 - **File Name Blacklist** - If any file is named a term already reserved for other endpoints, it should not render to the blog homepage, or anywhere else.
 
 #### Note

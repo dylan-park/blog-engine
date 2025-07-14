@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{error, info};
 
 struct FrontmatterIndex {
     posts: HashMap<String, FrontMatter>,
@@ -53,6 +53,7 @@ pub async fn setup_file_watcher() -> Result<()> {
     // Keep watcher alive
     std::mem::forget(watcher);
 
+    info!("File watcher spawned on: posts/");
     Ok(())
 }
 
@@ -74,6 +75,8 @@ pub async fn build_frontmatter_index() -> Result<()> {
     }
 
     *FRONTMATTER_INDEX.write().await = index;
+
+    info!("Frontmatter Index rebuilt");
     Ok(())
 }
 

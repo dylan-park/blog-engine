@@ -1,4 +1,4 @@
-use crate::utils::health_check::health_check;
+use crate::utils::{health_check, memory_manager};
 use anyhow::{Context, Result};
 use axum::{Router, routing::get, serve};
 use serde::Deserialize;
@@ -10,9 +10,10 @@ use tracing::info;
 mod blog;
 mod utils;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PageQuery {
     page: Option<usize>,
+    category: Option<String>,
 }
 
 #[tokio::main]
@@ -25,10 +26,18 @@ async fn main() -> Result<()> {
     // Create 'posts' directory if not already created
     fs::create_dir_all(Path::new("posts")).context("Failed to create 'posts' directory")?;
 
+    memory_manager::build_frontmatter_index()
+        .await
+        .context("Failed to build frontmatter index")?;
+    memory_manager::setup_file_watcher()
+        .await
+        .context("Failed to setup file watcher")?;
+
     // Build axum router
     let app = Router::new()
         .route("/", get(blog::render_page))
-        .route("/health", get(health_check))
+        .route("/category", get(blog::render_category_page))
+        .route("/health", get(health_check::health_check))
         .nest_service("/static", ServeDir::new("static"))
         .route("/{*path}", get(blog::render_page));
 

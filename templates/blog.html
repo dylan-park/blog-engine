@@ -3,7 +3,7 @@
 {% block content %}
 <div class="content">
     <div class="section">
-        <h2>Posts</h2>
+        <h2>Posts{% if category %} | {{ category }}{% endif %}</h2>
         {{ posts | safe }}
     </div>
     <div class="section">

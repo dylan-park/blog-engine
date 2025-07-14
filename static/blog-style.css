@@ -126,6 +126,16 @@
 	font-size: 0.8rem;
 	font-weight: 500;
 }
+
+.post-category a {
+	color: white;
+	text-decoration: none;
+}
+
+.post-category a:hover {
+	text-decoration: underline;
+}
+
 @media (max-width: 768px) {
 	.post-meta {
 		flex-direction: column;

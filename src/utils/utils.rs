@@ -2,6 +2,7 @@ use crate::blog::FrontMatter;
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use comrak::{ComrakOptions, markdown_to_html};
+use std::fs;
 
 pub async fn parse_markdown_with_frontmatter(md_input: String) -> Result<(FrontMatter, String)> {
     let (frontmatter_str, md_body) = if md_input.starts_with("+++") {
@@ -39,6 +40,24 @@ pub async fn truncate_html_text(html: &str, max_length: usize) -> Result<String>
     } else {
         Ok(truncated)
     }
+}
+
+pub async fn get_all_posts() -> Result<Vec<String>> {
+    Ok(fs::read_dir("posts")
+        .context("Unable to read directory 'posts'")?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_file())
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
+                path.file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .map(|s| s.to_string())
+            } else {
+                None
+            }
+        })
+        .collect())
 }
 
 async fn strip_html_tags(html: &str) -> Result<String> {

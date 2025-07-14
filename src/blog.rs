@@ -1,9 +1,6 @@
 use crate::{
     PageQuery,
-    utils::{
-        error::AppError,
-        utils::{format_date, parse_markdown_with_frontmatter, truncate_html_text},
-    },
+    utils::{error::AppError, memory_manager, utils},
 };
 use anyhow::{Context, Result};
 use axum::{
@@ -19,9 +16,9 @@ use tracing::info;
 
 #[derive(Debug, Deserialize)]
 pub struct FrontMatter {
-    title: Option<String>,
-    date: Option<NaiveDate>,
-    categories: Option<Vec<String>>,
+    pub title: Option<String>,
+    pub date: Option<NaiveDate>,
+    pub categories: Option<Vec<String>>,
 }
 
 pub async fn render_page(
@@ -62,9 +59,14 @@ pub async fn render_page(
 
     if md_input.is_empty() {
         // Blog Home
-        let recent_posts = render_recent_posts(params.page.unwrap_or(1))
-            .await
-            .context("Unable to render recent posts")?;
+        let recent_posts = render_posts(
+            params.clone(),
+            memory_manager::get_all_posts_sorted_by_date()
+                .await
+                .context("Unable to get all posts sorted by date")?,
+        )
+        .await
+        .context("Unable to render recent posts")?;
         context.insert("title", "Blog");
         context.insert("posts", &recent_posts.0);
         context.insert("pagination", &recent_posts.1);
@@ -87,7 +89,7 @@ pub async fn render_page(
         Ok((StatusCode::NOT_FOUND, Html(rendered)))
     } else {
         // Matching blog post
-        let parsed_input = parse_markdown_with_frontmatter(md_input)
+        let parsed_input = utils::parse_markdown_with_frontmatter(md_input)
             .await
             .context("Unable to parse markdown with frontmatter")?;
 
@@ -100,7 +102,7 @@ pub async fn render_page(
         );
         context.insert("content", &html_content);
 
-        let formatted_date = format_date(metadata.date).await;
+        let formatted_date = utils::format_date(metadata.date).await;
         context.insert("date", &formatted_date.context("Unable to format date")?);
 
         let rendered = tera
@@ -114,28 +116,39 @@ pub async fn render_page(
     }
 }
 
-async fn render_recent_posts(page: usize) -> Result<(String, String)> {
-    // Get all files from posts dir
-    let mut files: Vec<String> = fs::read_dir("posts")
-        .context("Unable to read directory 'posts'")?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_file())
-        .filter_map(|entry| {
-            let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
-                path.file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .map(|s| s.to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
-    // Sort descending
-    files.sort_by(|a, b| b.cmp(a));
-    let total_files = files.len();
+pub async fn render_category_page(
+    Query(params): Query<PageQuery>,
+) -> Result<(StatusCode, Html<String>), AppError> {
+    let tera =
+        Tera::new("templates/**/*").context("Failed to load templates from 'templates/**/*'")?;
+    let mut context = TeraContext::new();
+    let category = params.clone().category.unwrap_or("".to_string());
+    let page = params.page.unwrap_or(1);
+    let recent_posts = render_posts(
+        params,
+        memory_manager::get_posts_by_category(&category)
+            .await
+            .context("Failed to get posts by category")?,
+    )
+    .await
+    .context("Unable to render recent posts")?;
+    context.insert("title", "Blog");
+    context.insert("posts", &recent_posts.0);
+    context.insert("pagination", &recent_posts.1);
+    context.insert("category", &category);
+    let rendered = tera
+        .render("blog.html", &context)
+        .context("Error rendering template: 'blog.html'")?;
+    info!("Served: Blog Category | {category} | Page {}", page);
+    Ok((StatusCode::OK, Html(rendered)))
+}
+
+async fn render_posts(params: PageQuery, files_input: Vec<String>) -> Result<(String, String)> {
+    let total_files = files_input.len();
+    let page = params.page.unwrap_or(1);
+    let category = params.category.unwrap_or("".to_string());
     // Query String pagination
-    files = files
+    let files = files_input
         .chunks(3)
         .nth(page - 1)
         .map(|chunk| chunk.to_vec())
@@ -145,14 +158,14 @@ async fn render_recent_posts(page: usize) -> Result<(String, String)> {
 
     for file in &files {
         let md_input = fs::read_to_string(format!("posts/{file}.md")).unwrap_or_default();
-        let parsed_input = parse_markdown_with_frontmatter(md_input)
+        let parsed_input = utils::parse_markdown_with_frontmatter(md_input)
             .await
             .context("Unable to parse markdown with frontmatter")?;
         posts_output = format!(
             "{}{}",
             posts_output,
             generate_blog_post_card(
-                format_date(parsed_input.0.date)
+                utils::format_date(parsed_input.0.date)
                     .await
                     .context("Unable to format date")?,
                 parsed_input
@@ -162,7 +175,7 @@ async fn render_recent_posts(page: usize) -> Result<(String, String)> {
                     .clone(),
                 file.to_owned(),
                 parsed_input.0.title.context("Unable to get post title")?,
-                truncate_html_text(parsed_input.1.as_str(), 240)
+                utils::truncate_html_text(parsed_input.1.as_str(), 240)
                     .await
                     .context("Unable to truncate html text")?,
             )
@@ -171,7 +184,7 @@ async fn render_recent_posts(page: usize) -> Result<(String, String)> {
         );
     }
 
-    let pagination_output = generate_pagination(total_files, page)
+    let pagination_output = generate_pagination(total_files, page, category)
         .await
         .context("Error generating pagination")?;
 
@@ -199,10 +212,14 @@ async fn generate_blog_post_card(
         .context("Error rendering template: 'blog-post-card.html'")?)
 }
 
-async fn generate_pagination(total_files: usize, page: usize) -> Result<String> {
+async fn generate_pagination(total_files: usize, page: usize, category: String) -> Result<String> {
     let tera =
         Tera::new("templates/**/*").context("Failed to load templates from 'templates/**/*'")?;
     let mut context = TeraContext::new();
+
+    if !category.is_empty() {
+        context.insert("category", &category);
+    }
 
     if total_files > 3 && (page - 1) * 3 < total_files {
         let total_pages = total_files.div_ceil(3);

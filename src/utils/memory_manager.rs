@@ -1,7 +1,4 @@
-use crate::{
-    blog::FrontMatter,
-    utils::utils,
-};
+use crate::{blog::FrontMatter, utils::utils};
 use anyhow::{Context, Result};
 use futures::future::join_all;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -85,7 +82,9 @@ pub async fn setup_file_watcher() -> Result<()> {
 }
 
 pub async fn build_frontmatter_index() -> Result<()> {
-    let file_names = utils::get_all_posts().await.context("Unable to get all posts")?;
+    let file_names = utils::get_all_posts()
+        .await
+        .context("Unable to get all posts")?;
 
     // Process files concurrently
     let tasks: Vec<_> = file_names
@@ -147,44 +146,45 @@ pub async fn build_frontmatter_index() -> Result<()> {
     Ok(())
 }
 
-pub async fn get_posts_by_category(category: &str) -> Result<Vec<String>> {
+async fn get_posts_with_filter<F>(filter_fn: F) -> Result<Vec<String>>
+where
+    F: Fn(&str, &FrontMatter) -> bool,
+{
     let index = FRONTMATTER_INDEX.read().await;
 
-    let mut matching_posts: Vec<_> = index
+    let mut posts_with_dates: Vec<_> = index
         .posts
         .iter()
-        .filter(|(_, fm)| {
-            fm.categories
-                .as_ref()
-                .map_or(false, |cats| cats.iter().any(|c| c == category))
+        .filter_map(|(filename, fm)| {
+            if filter_fn(filename, fm) {
+                fm.date.map(|date| (Reverse(date), filename.as_str()))
+            } else {
+                None
+            }
         })
-        .filter_map(|(filename, fm)| fm.date.map(|date| (Reverse(date), filename)))
         .collect();
 
-    // Sort by date (descending )
-    matching_posts.sort_by_key(|(rev_date, _)| *rev_date);
+    posts_with_dates.sort_unstable_by_key(|(rev_date, _)| *rev_date);
 
-    Ok(matching_posts
+    Ok(posts_with_dates
         .into_iter()
         .map(|(_, filename)| filename.to_string())
         .collect())
 }
 
 pub async fn get_all_posts_sorted_by_date() -> Result<Vec<String>> {
-    let index = FRONTMATTER_INDEX.read().await;
-    let mut files_with_dates: Vec<_> = index
-        .posts
-        .iter()
-        .filter_map(|(filename, fm)| fm.date.as_ref().map(|date| (Reverse(*date), filename)))
-        .collect();
+    get_posts_with_filter(|_, _| true).await
+}
 
-    // Sort by date (descending )
-    files_with_dates.sort_by_key(|(rev_date, _)| *rev_date);
+pub async fn get_posts_by_category(category: &str) -> Result<Vec<String>> {
+    if category.is_empty() {
+        return Ok(Vec::new());
+    }
 
-    // To get filenames only:
-    let sorted_filenames: Vec<String> = files_with_dates
-        .into_iter()
-        .map(|(_, filename)| filename.to_string())
-        .collect();
-    Ok(sorted_filenames)
+    get_posts_with_filter(|_, fm| {
+        fm.categories
+            .as_ref()
+            .is_some_and(|cats| cats.iter().any(|c| c.eq_ignore_ascii_case(category)))
+    })
+    .await
 }

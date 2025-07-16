@@ -1,13 +1,14 @@
 use crate::{
     blog::FrontMatter,
-    utils::utils::{get_all_posts, parse_markdown_with_frontmatter},
+    utils::utils,
 };
 use anyhow::{Context, Result};
+use futures::future::join_all;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::sync::Lazy;
-use std::{cmp::Reverse, collections::HashMap, fs, path::Path, time::Duration};
+use std::{cmp::Reverse, collections::HashMap, path::Path, time::Duration};
 use tokio::{
-    pin,
+    fs, pin,
     sync::{RwLock, mpsc},
     time::sleep,
 };
@@ -84,25 +85,65 @@ pub async fn setup_file_watcher() -> Result<()> {
 }
 
 pub async fn build_frontmatter_index() -> Result<()> {
-    let mut index = FrontmatterIndex {
-        posts: HashMap::new(),
-    };
+    let file_names = utils::get_all_posts().await.context("Unable to get all posts")?;
 
-    // Read all posts once at startup
-    for file_name in get_all_posts().await.context("Unable to get all posts")? {
-        let frontmatter = parse_markdown_with_frontmatter(
-            fs::read_to_string(format!("posts/{}.md", file_name.as_str())).unwrap_or_default(),
-        )
-        .await
-        .context("Unable to parse markdown with frontmatter")?
-        .0;
+    // Process files concurrently
+    let tasks: Vec<_> = file_names
+        .into_iter()
+        .map(|file_name| async move {
+            let file_path = format!("posts/{file_name}.md");
 
-        index.posts.insert(file_name.clone(), frontmatter);
+            let content = fs::read_to_string(&file_path)
+                .await
+                .with_context(|| format!("Failed to read file: {file_path}"))?;
+
+            let frontmatter = utils::parse_markdown_with_frontmatter(content)
+                .await
+                .with_context(|| format!("Failed to parse frontmatter for: {file_name}"))?
+                .0;
+
+            Ok::<_, anyhow::Error>((file_name, frontmatter))
+        })
+        .collect();
+
+    // Wait for all tasks to complete
+    let results = join_all(tasks).await;
+
+    // Build the index from successful results
+    let mut posts = HashMap::new();
+    let mut errors = Vec::new();
+
+    for result in results {
+        match result {
+            Ok((file_name, frontmatter)) => {
+                posts.insert(file_name, frontmatter);
+            }
+            Err(e) => {
+                errors.push(e);
+            }
+        }
     }
 
+    // Log errors but don't fail the entire rebuild
+    for error in &errors {
+        error!("Error processing file: {:#}", error);
+    }
+
+    // Update the index with successful results
+    let posts_count = posts.len();
+    let index = FrontmatterIndex { posts };
     *FRONTMATTER_INDEX.write().await = index;
 
-    info!("Frontmatter Index rebuilt");
+    info!(
+        "Frontmatter Index rebuilt with {} posts ({} errors)",
+        posts_count,
+        errors.len()
+    );
+
+    if posts_count == 0 && !errors.is_empty() {
+        anyhow::bail!("Failed to process any posts");
+    }
+
     Ok(())
 }
 

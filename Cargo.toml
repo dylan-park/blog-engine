@@ -8,6 +8,7 @@ anyhow = "1.0.98"
 axum = "0.8.4"
 chrono = { version = "0.4.41", features = ["serde"] }
 comrak = "0.39.1"
+futures = "0.3.31"
 notify = "8.1.0"
 once_cell = "1.21.3"
 serde = { version = "1.0.219", features = ["derive"] }

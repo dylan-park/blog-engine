@@ -1,6 +1,6 @@
 use crate::{
     PageQuery,
-    utils::{error::AppError, memory_manager, utils},
+    utils::{error::AppError, general, memory_manager},
 };
 use anyhow::{Context, Result};
 use axum::{
@@ -89,7 +89,7 @@ pub async fn render_page(
         Ok((StatusCode::NOT_FOUND, Html(rendered)))
     } else {
         // Matching blog post
-        let parsed_input = utils::parse_markdown_with_frontmatter(md_input)
+        let parsed_input = general::parse_markdown_with_frontmatter(md_input)
             .await
             .context("Unable to parse markdown with frontmatter")?;
 
@@ -102,7 +102,7 @@ pub async fn render_page(
         );
         context.insert("content", &html_content);
 
-        let formatted_date = utils::format_date(metadata.date).await;
+        let formatted_date = general::format_date(metadata.date).await;
         context.insert("date", &formatted_date.context("Unable to format date")?);
 
         let rendered = tera
@@ -158,14 +158,14 @@ async fn render_posts(params: PageQuery, files_input: Vec<String>) -> Result<(St
 
     for file in &files {
         let md_input = fs::read_to_string(format!("posts/{file}.md")).unwrap_or_default();
-        let parsed_input = utils::parse_markdown_with_frontmatter(md_input)
+        let parsed_input = general::parse_markdown_with_frontmatter(md_input)
             .await
             .context("Unable to parse markdown with frontmatter")?;
         posts_output = format!(
             "{}{}",
             posts_output,
             generate_blog_post_card(
-                utils::format_date(parsed_input.0.date)
+                general::format_date(parsed_input.0.date)
                     .await
                     .context("Unable to format date")?,
                 parsed_input
@@ -175,7 +175,7 @@ async fn render_posts(params: PageQuery, files_input: Vec<String>) -> Result<(St
                     .clone(),
                 file.to_owned(),
                 parsed_input.0.title.context("Unable to get post title")?,
-                utils::truncate_html_text(parsed_input.1.as_str(), 240)
+                general::truncate_html_text(parsed_input.1.as_str(), 240)
                     .await
                     .context("Unable to truncate html text")?,
             )
@@ -207,9 +207,8 @@ async fn generate_blog_post_card(
     context.insert("title", &title);
     context.insert("content", &content);
 
-    Ok(tera
-        .render("blog-post-card.html", &context)
-        .context("Error rendering template: 'blog-post-card.html'")?)
+    tera.render("blog-post-card.html", &context)
+        .context("Error rendering template: 'blog-post-card.html'")
 }
 
 async fn generate_pagination(total_files: usize, page: usize, category: String) -> Result<String> {

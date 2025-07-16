@@ -1,4 +1,4 @@
-use crate::{blog::FrontMatter, utils::utils};
+use crate::{blog::FrontMatter, utils::general};
 use anyhow::{Context, Result};
 use futures::future::join_all;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -82,7 +82,7 @@ pub async fn setup_file_watcher() -> Result<()> {
 }
 
 pub async fn build_frontmatter_index() -> Result<()> {
-    let file_names = utils::get_all_posts()
+    let file_names = general::get_all_posts()
         .await
         .context("Unable to get all posts")?;
 
@@ -96,7 +96,7 @@ pub async fn build_frontmatter_index() -> Result<()> {
                 .await
                 .with_context(|| format!("Failed to read file: {file_path}"))?;
 
-            let frontmatter = utils::parse_markdown_with_frontmatter(content)
+            let frontmatter = general::parse_markdown_with_frontmatter(content)
                 .await
                 .with_context(|| format!("Failed to parse frontmatter for: {file_name}"))?
                 .0;

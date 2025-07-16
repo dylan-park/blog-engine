@@ -5,12 +5,13 @@ use crate::{
 use anyhow::{Context, Result};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::sync::Lazy;
-use std::cmp::Reverse;
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
-use tokio::sync::RwLock;
-use tracing::{error, info};
+use std::{cmp::Reverse, collections::HashMap, fs, path::Path, time::Duration};
+use tokio::{
+    pin,
+    sync::{RwLock, mpsc},
+    time::sleep,
+};
+use tracing::{error, info, warn};
 
 struct FrontmatterIndex {
     posts: HashMap<String, FrontMatter>,
@@ -23,17 +24,18 @@ static FRONTMATTER_INDEX: Lazy<RwLock<FrontmatterIndex>> = Lazy::new(|| {
 });
 
 pub async fn setup_file_watcher() -> Result<()> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+    let (tx, mut rx) = mpsc::channel(100);
+    let tx_clone = tx.clone();
 
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<Event, notify::Error>| {
-            if let Ok(event) = res {
-                if matches!(
+            if let Ok(event) = res
+                && matches!(
                     event.kind,
                     EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-                ) {
-                    let _ = tx.blocking_send(event);
-                }
+                )
+            {
+                let _ = tx_clone.try_send(event);
             }
         },
         Config::default(),
@@ -42,16 +44,40 @@ pub async fn setup_file_watcher() -> Result<()> {
     watcher.watch(Path::new("posts/"), RecursiveMode::Recursive)?;
 
     tokio::spawn(async move {
+        // Keep watcher alive for the task lifetime
+        let _watcher = watcher;
+
         while let Some(_event) = rx.recv().await {
+            // Consume any additional events that arrive during debounce period
+            let debounce_timer = sleep(Duration::from_millis(100));
+            pin!(debounce_timer);
+
+            loop {
+                tokio::select! {
+                    _ = &mut debounce_timer => {
+                        // Debounce period elapsed, process the rebuild
+                        break;
+                    }
+                    additional_event = rx.recv() => {
+                        match additional_event {
+                            Some(_) => {
+                                // Reset the debounce timer for additional events
+                                debounce_timer.set(sleep(Duration::from_millis(100)));
+                            }
+                            None => return, // Channel closed
+                        }
+                    }
+                }
+            }
+
             // Rebuild index when posts directory changes
             if let Err(err) = build_frontmatter_index().await {
                 error!("Error rebuilding index: {:?}", err);
             }
         }
-    });
 
-    // Keep watcher alive
-    std::mem::forget(watcher);
+        warn!("File watcher task ended unexpectedly");
+    });
 
     info!("File watcher spawned on: posts/");
     Ok(())

@@ -6,11 +6,13 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 axum = "0.8.4"
+blake3 = "1.8.2"
 chrono = { version = "0.4.41", features = ["serde"] }
 comrak = "0.39.1"
 futures = "0.3.31"
 notify = "8.1.0"
 once_cell = "1.21.3"
+rss = "2.0.12"
 serde = { version = "1.0.219", features = ["derive"] }
 tera = "1.20.0"
 tokio = { version = "1.46.0", features = ["full"] }
@@ -18,3 +20,4 @@ toml = "0.9.1"
 tower-http = { version = "0.6.6", features = ["fs"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+uuid = { version = "1.17.0", features = ["v4"] }

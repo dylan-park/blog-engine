@@ -106,10 +106,30 @@ pub async fn build_frontmatter_index() -> Result<()> {
                 .await
                 .with_context(|| format!("Failed to parse frontmatter for: {file_name}"))?;
             let mut frontmatter = output.0;
+            // Set summary
             frontmatter.summary = Some(
                 utils::truncate_html_text(output.1.as_str(), 240)
                     .await
                     .context("Unable to truncate html text")?,
+            );
+            // Generate and set content hash
+            let frontmatter_clone = frontmatter.clone();
+            // Content hash is made up of: Title + Date + Categories(toString) + Content
+            frontmatter.content_hash = Some(
+                content_hash_blake3(
+                    format!(
+                        "{}{}{:?}{}",
+                        frontmatter_clone.title.context("Failed to parse title")?,
+                        frontmatter_clone.date.context("Failed to parse date")?,
+                        frontmatter_clone
+                            .categories
+                            .context("Failed to parse categories")?,
+                        &output.1,
+                    )
+                    .as_str(),
+                )
+                .await
+                .context("Unable to get hash")?,
             );
 
             Ok::<_, anyhow::Error>((file_name, frontmatter))
@@ -163,6 +183,11 @@ pub async fn get_post_summary(post: String) -> Result<String> {
     let test = index.get_summary(&post).context("Unable to get summary")?;
 
     Ok(test.to_string())
+}
+
+async fn content_hash_blake3(content: &str) -> Result<String> {
+    let hash = blake3::hash(content.as_bytes());
+    Ok(hash.to_hex().to_string())
 }
 
 async fn get_posts_with_filter<F>(filter_fn: F) -> Result<Vec<String>>

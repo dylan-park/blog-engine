@@ -2,12 +2,17 @@ use crate::utils::{health_check, memory_manager};
 use anyhow::{Context, Result};
 use axum::{Router, routing::get, serve};
 use serde::Deserialize;
-use std::{fs, net::SocketAddr, path::Path};
+use std::{
+    fs,
+    net::SocketAddr,
+    path::Path,
+};
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 use tracing::info;
 
 mod blog;
+mod rss_feed;
 mod utils;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -32,6 +37,10 @@ async fn main() -> Result<()> {
     memory_manager::setup_file_watcher()
         .await
         .context("Failed to setup file watcher")?;
+
+    rss_feed::init_rss_state()
+        .await
+        .context("Unable to init rss state")?;
 
     // Build axum router
     let app = Router::new()

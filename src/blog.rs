@@ -14,12 +14,13 @@ use std::{fs, path::Path as StdPath};
 use tera::{Context as TeraContext, Tera};
 use tracing::info;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FrontMatter {
     pub title: Option<String>,
     pub date: Option<NaiveDate>,
     pub categories: Option<Vec<String>>,
     pub summary: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 pub async fn render_page(

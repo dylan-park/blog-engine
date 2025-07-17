@@ -83,7 +83,7 @@ pub async fn setup_file_watcher() -> Result<()> {
         warn!("File watcher task ended unexpectedly");
     });
 
-    info!("File watcher spawned on: posts/");
+    info!("File watcher spawned on: ./posts/");
     Ok(())
 }
 

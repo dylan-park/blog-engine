@@ -19,6 +19,7 @@ pub struct FrontMatter {
     pub title: Option<String>,
     pub date: Option<NaiveDate>,
     pub categories: Option<Vec<String>>,
+    pub summary: Option<String>,
 }
 
 pub async fn render_page(
@@ -175,9 +176,9 @@ async fn render_posts(params: PageQuery, files_input: Vec<String>) -> Result<(St
                     .clone(),
                 file.to_owned(),
                 parsed_input.0.title.context("Unable to get post title")?,
-                utils::truncate_html_text(parsed_input.1.as_str(), 240)
+                memory_manager::get_post_summary(file.to_string())
                     .await
-                    .context("Unable to truncate html text")?,
+                    .context("Unable to get post summary")?,
             )
             .await
             .context("Error generating blog post card")?

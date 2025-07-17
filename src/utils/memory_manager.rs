@@ -15,6 +15,12 @@ struct FrontmatterIndex {
     posts: HashMap<String, FrontMatter>,
 }
 
+impl FrontmatterIndex {
+    pub fn get_summary(&self, post: &str) -> Option<&str> {
+        self.posts.get(post).and_then(|fm| fm.summary.as_deref())
+    }
+}
+
 static FRONTMATTER_INDEX: Lazy<RwLock<FrontmatterIndex>> = Lazy::new(|| {
     RwLock::new(FrontmatterIndex {
         posts: HashMap::new(),
@@ -96,10 +102,15 @@ pub async fn build_frontmatter_index() -> Result<()> {
                 .await
                 .with_context(|| format!("Failed to read file: {file_path}"))?;
 
-            let frontmatter = utils::parse_markdown_with_frontmatter(content)
+            let output = utils::parse_markdown_with_frontmatter(content)
                 .await
-                .with_context(|| format!("Failed to parse frontmatter for: {file_name}"))?
-                .0;
+                .with_context(|| format!("Failed to parse frontmatter for: {file_name}"))?;
+            let mut frontmatter = output.0;
+            frontmatter.summary = Some(
+                utils::truncate_html_text(output.1.as_str(), 240)
+                    .await
+                    .context("Unable to truncate html text")?,
+            );
 
             Ok::<_, anyhow::Error>((file_name, frontmatter))
         })
@@ -144,6 +155,14 @@ pub async fn build_frontmatter_index() -> Result<()> {
     }
 
     Ok(())
+}
+
+pub async fn get_post_summary(post: String) -> Result<String> {
+    let index = FRONTMATTER_INDEX.read().await;
+
+    let test = index.get_summary(&post).context("Unable to get summary")?;
+
+    Ok(test.to_string())
 }
 
 async fn get_posts_with_filter<F>(filter_fn: F) -> Result<Vec<String>>
